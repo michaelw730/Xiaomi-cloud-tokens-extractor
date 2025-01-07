@@ -7,9 +7,24 @@ import random
 import time
 from getpass import getpass
 from sys import platform
+from pprint import pprint
 
 import requests
 from Crypto.Cipher import ARC4
+
+from dotenv import load_dotenv
+load_dotenv()
+import json
+import csv
+
+# config = dotenv_values(".env")
+
+if 'XIAOMI_USERNAME' in os.environ:
+    XIAOMI_USERNAME = os.environ['XIAOMI_USERNAME']
+    XIAOMI_PASSWORD = os.environ['XIAOMI_PASSWORD']
+    XIAOMI_SERVER = os.environ['XIAOMI_SERVER']
+    OUTPUT_JSON_FILE = os.environ['OUTPUT_JSON_FILE']
+    OUTPUT_CSV_FILE = os.environ['OUTPUT_CSV_FILE']
 
 if platform != "win32":
     import readline
@@ -251,12 +266,18 @@ def print_entry(key, value, tab):
 def main():
     servers = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
     servers_str = ", ".join(servers)
-    print("Username (email or user ID):")
-    username = input()
-    print("Password:")
-    password = getpass("")
-    print(f"Server (one of: {servers_str}) Leave empty to check all available:")
-    server = input()
+    username = os.getenv('XIAOMI_USERNAME')
+    if username is None:
+        print("Username (email or user ID):")
+        username = input()
+    password = os.getenv('XIAOMI_PASSWORD')
+    if password is None:
+        print("Password:")
+        password = getpass("")
+    server = os.getenv('XIAOMI_SERVER')
+    if server is None:
+        print(f"Server (one of: {servers_str}) Leave empty to check all available:")
+        server = input()
     while server not in ["", *servers]:
         print(f"Invalid server provided. Valid values: {servers_str}")
         print("Server:")
@@ -269,6 +290,8 @@ def main():
     connector = XiaomiCloudConnector(username, password)
     print("Logging in...")
     logged = connector.login()
+
+    results = []
     if logged:
         print("Logged in.")
         print()
@@ -295,15 +318,21 @@ def main():
                         continue
                     print(f'Devices found for server "{current_server}" @ home "{home["home_id"]}":')
                     for device in devices["result"]["device_info"]:
+                        pprint(device)
                         print_tabbed("---------", 3)
                         if "name" in device:
                             print_entry("NAME", device["name"], 3)
+
+                        ble_key = ""
                         if "did" in device:
                             print_entry("ID", device["did"], 3)
                             if "blt" in device["did"]:
                                 beaconkey = connector.get_beaconkey(current_server, device["did"])
                                 if beaconkey and "result" in beaconkey and "beaconkey" in beaconkey["result"]:
                                     print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
+                                    ble_key = beaconkey["result"]["beaconkey"]
+
+                                    pprint(beaconkey["result"])
                         if "mac" in device:
                             print_entry("MAC", device["mac"], 3)
                         if "localip" in device:
@@ -312,6 +341,18 @@ def main():
                             print_entry("TOKEN", device["token"], 3)
                         if "model" in device:
                             print_entry("MODEL", device["model"], 3)
+
+                        results.append({
+                            "server": current_server,
+                            "name": device["name"] if 'name' in device else '',
+                            "id": device["did"] if 'did' in device else '',
+                            "mac": device["mac"] if 'mac' in device else '',
+                            "ip": device["localip"] if 'localip' in device else '',
+                            "token": device["token"] if 'token' in device else '',
+                            "model": device["model"] if 'model' in device else '',
+                            "ble_key": ble_key,
+                            "fw_version": device["extra"]["fw_version"] if 'extra'in device else '',
+                        })
                     print_tabbed("---------", 3)
                     print()
                 else:
@@ -320,8 +361,19 @@ def main():
         print("Unable to log in.")
 
     print()
-    print("Press ENTER to finish")
-    input()
+    pprint(results)
+
+    # output json file
+    if OUTPUT_JSON_FILE != None:
+        with open(OUTPUT_JSON_FILE, "w") as data_file:
+            json.dump(results, data_file, indent=4, sort_keys=True)
+
+    # output csv file
+    if OUTPUT_CSV_FILE != None:
+        with open(OUTPUT_CSV_FILE, "w") as f:
+            w = csv.DictWriter(f, results[0].keys())
+            w.writeheader()
+            w.writerows(results)
 
 
 if __name__ == "__main__":
