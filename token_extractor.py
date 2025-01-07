@@ -13,6 +13,8 @@ import threading
 import time
 from getpass import getpass
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from sys import platform
+from pprint import pprint
 
 import requests
 
@@ -21,6 +23,21 @@ try:
 except ModuleNotFoundError:
     from Cryptodome.Cipher import ARC4
 from PIL import Image
+
+from dotenv import load_dotenv
+load_dotenv()
+import json
+import csv
+
+# config = dotenv_values(".env")
+
+if 'XIAOMI_USERNAME' in os.environ:
+    XIAOMI_USERNAME = os.environ['XIAOMI_USERNAME']
+    XIAOMI_PASSWORD = os.environ['XIAOMI_PASSWORD']
+    XIAOMI_SERVER = os.environ['XIAOMI_SERVER']
+    OUTPUT_JSON_FILE = os.environ['OUTPUT_JSON_FILE']
+    OUTPUT_CSV_FILE = os.environ['OUTPUT_CSV_FILE']
+
 
 if sys.platform != "win32":
     import readline
@@ -401,22 +418,38 @@ def start_image_server(image: bytes) -> None:
 def main() -> None:
     print_banner()
     servers_str = ", ".join(SERVERS)
-    if args.username:
-        username = args.username
-    else:
-        print_if_interactive("Username (email or user ID):")
+    # if args.username:
+    #     username = args.username
+    # else:
+    #     print_if_interactive("Username (email or user ID):")
+    #     username = input()
+    # if args.password:
+    #     password = args.password
+    # else:
+    #     print_if_interactive("Password:")
+    #     password = getpass("")
+    # if args.server is not None:
+    #     server = args.server
+    # elif args.non_interactive:
+    #     server = ""
+    # else:
+    #     print_if_interactive(f"Server (one of: {servers_str}) Leave empty to check all available:")
+
+    username = os.getenv('XIAOMI_USERNAME')
+    if username is None:
+        print("Username (email or user ID):")
         username = input()
-    if args.password:
-        password = args.password
-    else:
-        print_if_interactive("Password:")
+    password = os.getenv('XIAOMI_PASSWORD')
+    if password is None:
+        print("Password:")
         password = getpass("")
-    if args.server is not None:
-        server = args.server
-    elif args.non_interactive:
-        server = ""
-    else:
-        print_if_interactive(f"Server (one of: {servers_str}) Leave empty to check all available:")
+    server = os.getenv('XIAOMI_SERVER')
+    if server is None:
+        print(f"Server (one of: {servers_str}) Leave empty to check all available:")
+        server = input()
+    while server not in ["", *SERVERS]:
+        print(f"Invalid server provided. Valid values: {servers_str}")
+        print("Server:")
         server = input()
         while server not in ["", *SERVERS]:
             print_if_interactive(f"Invalid server provided. Valid values: {servers_str}")
@@ -431,6 +464,8 @@ def main() -> None:
     connector = XiaomiCloudConnector(username, password)
     print_if_interactive("Logging in...")
     logged = connector.login()
+
+    results = []
     if logged:
         print_if_interactive("Logged in.")
         print_if_interactive()
@@ -459,9 +494,12 @@ def main() -> None:
                     print_if_interactive(f'Devices found for server "{current_server}" @ home "{home["home_id"]}":')
                     for device in devices["result"]["device_info"]:
                         device_data = {**device}
+                        pprint(device)
                         print_tabbed("---------", 3)
                         if "name" in device:
                             print_entry("NAME", device["name"], 3)
+
+                        ble_key = ""
                         if "did" in device:
                             print_entry("ID", device["did"], 3)
                             if "blt" in device["did"]:
@@ -469,6 +507,9 @@ def main() -> None:
                                 if beaconkey and "result" in beaconkey and "beaconkey" in beaconkey["result"]:
                                     print_entry("BLE KEY", beaconkey["result"]["beaconkey"], 3)
                                     device_data["BLE_DATA"] = beaconkey["result"]
+                                    ble_key = beaconkey["result"]["beaconkey"]
+
+                                    pprint(beaconkey["result"])
                         if "mac" in device:
                             print_entry("MAC", device["mac"], 3)
                         if "localip" in device:
@@ -478,6 +519,18 @@ def main() -> None:
                         if "model" in device:
                             print_entry("MODEL", device["model"], 3)
                         home["devices"].append(device_data)
+
+                        results.append({
+                            "server": current_server,
+                            "name": device["name"] if 'name' in device else '',
+                            "id": device["did"] if 'did' in device else '',
+                            "mac": device["mac"] if 'mac' in device else '',
+                            "ip": device["localip"] if 'localip' in device else '',
+                            "token": device["token"] if 'token' in device else '',
+                            "model": device["model"] if 'model' in device else '',
+                            "ble_key": ble_key,
+                            "fw_version": device["extra"]["fw_version"] if 'extra'in device else '',
+                        })
                     print_tabbed("---------", 3)
                     print_if_interactive()
                 else:
@@ -489,10 +542,24 @@ def main() -> None:
     else:
         print_if_interactive("Unable to log in.")
 
-    if not args.non_interactive:
-        print_if_interactive()
-        print_if_interactive("Press ENTER to finish")
-        input()
+    # if not args.non_interactive:
+    #     print_if_interactive()
+    #     print_if_interactive("Press ENTER to finish")
+    #     input()
+    print()
+    pprint(results)
+
+    # output json file
+    if OUTPUT_JSON_FILE != None:
+        with open(OUTPUT_JSON_FILE, "w") as data_file:
+            json.dump(results, data_file, indent=4, sort_keys=True)
+
+    # output csv file
+    if OUTPUT_CSV_FILE != None:
+        with open(OUTPUT_CSV_FILE, "w") as f:
+            w = csv.DictWriter(f, results[0].keys())
+            w.writeheader()
+            w.writerows(results)
 
 
 if __name__ == "__main__":
