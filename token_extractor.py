@@ -138,9 +138,24 @@ class XiaomiCloudConnector:
                 self._code = json_resp.get("code", None)
             else:
                 if "notificationUrl" in json_resp:
-                    print_if_interactive("Two factor authentication required, please use following url and restart extractor:")
-                    print_if_interactive(json_resp["notificationUrl"])
+                    verify_url = json_resp["notificationUrl"]
+
+                    print_if_interactive("Two-factor authentication required, please use the following url to get your 2FA code:")
+                    print_if_interactive(verify_url)
                     print_if_interactive()
+                    print_if_interactive("Code (input it here, NOT IN THE BROWSER):")
+                    ticket = input()
+
+                    json_resp = self.verify_ticket(verify_url, ticket)
+                    if not json_resp:
+                        _LOGGER.error("Failed verifying ticket!")
+                        return False
+
+                    location = json_resp["location"]
+                    self._session.get(location, allow_redirects=True)
+                    self.login_step_1()
+
+                    return True
                 else:
                     _LOGGER.error("login_step_2: Login failed, server returned: %s", json_resp)
         else:
