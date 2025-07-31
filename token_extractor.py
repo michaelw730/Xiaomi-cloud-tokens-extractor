@@ -26,13 +26,23 @@ if sys.platform != "win32":
     import readline
 
 SERVERS = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
+NAME_TO_LEVEL = {
+    'CRITICAL': logging.CRITICAL,
+    'FATAL': logging.FATAL,
+    'ERROR': logging.ERROR,
+    'WARN': logging.WARNING,
+    'WARNING': logging.WARNING,
+    'INFO': logging.INFO,
+    'DEBUG': logging.DEBUG,
+    'NOTSET': logging.NOTSET,
+}
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-ni", "--non_interactive", required=False, help="Non-nteractive mode", action="store_true")
 parser.add_argument("-u", "--username", required=False, help="Username")
 parser.add_argument("-p", "--password", required=False, help="Password")
 parser.add_argument("-s", "--server", required=False, help="Server", choices=[*SERVERS, ""])
-parser.add_argument("-l", "--log_level", required=False, help="Log level", default="CRITICAL", choices=list(logging.getLevelNamesMapping().keys()))
+parser.add_argument("-l", "--log_level", required=False, help="Log level", default="CRITICAL", choices=list(NAME_TO_LEVEL.keys()))
 parser.add_argument("-o", "--output", required=False, help="Output file")
 parser.add_argument("--host", required=False, help="Host")
 args = parser.parse_args()
@@ -40,7 +50,7 @@ if args.non_interactive and (not args.username or not args.password):
     parser.error("You need to specify username and password or run as interactive.")
 
 _LOGGER = logging.getLogger("token_extractor")
-_LOGGER.level = logging.getLevelNamesMapping()[args.log_level.upper()]
+_LOGGER.level = NAME_TO_LEVEL[args.log_level.upper()]
 handler = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
