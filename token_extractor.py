@@ -354,17 +354,28 @@ class XiaomiCloudConnector:
         return r.encrypt(base64.b64decode(payload))
 
 
-def print_if_interactive(value="") -> None:
+def print_if_interactive(value: str="") -> None:
     if not args.non_interactive:
         print(value)
 
-def print_tabbed(value, tab) -> None:
+def print_tabbed(value: str, tab: int) -> None:
     print_if_interactive(" " * tab + value)
 
 
-def print_entry(key, value, tab):
+def print_entry(key: str, value: str, tab: int) -> None:
     if value:
         print_tabbed(f'{key + ":": <10}{value}', tab)
+
+
+def print_banner() -> None:
+    print_if_interactive(r"""
+                               Xiaomi Cloud
+___ ____ _  _ ____ _  _ ____    ____ _  _ ___ ____ ____ ____ ___ ____ ____ 
+ |  |  | |_/  |___ |\ | [__     |___  \/   |  |__/ |__| |     |  |  | |__/ 
+ |  |__| | \_ |___ | \| ___]    |___ _/\_  |  |  \ |  | |___  |  |__| |  \ 
+                                                        by Piotr Machowski 
+
+    """)
 
 
 def start_image_server(image: bytes) -> None:
@@ -388,6 +399,7 @@ def start_image_server(image: bytes) -> None:
 
 
 def main() -> None:
+    print_banner()
     servers_str = ", ".join(SERVERS)
     if args.username:
         username = args.username
