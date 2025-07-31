@@ -26,13 +26,23 @@ if sys.platform != "win32":
     import readline
 
 SERVERS = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
+NAME_TO_LEVEL = {
+    'CRITICAL': logging.CRITICAL,
+    'FATAL': logging.FATAL,
+    'ERROR': logging.ERROR,
+    'WARN': logging.WARNING,
+    'WARNING': logging.WARNING,
+    'INFO': logging.INFO,
+    'DEBUG': logging.DEBUG,
+    'NOTSET': logging.NOTSET,
+}
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-ni", "--non_interactive", required=False, help="Non-nteractive mode", action="store_true")
 parser.add_argument("-u", "--username", required=False, help="Username")
 parser.add_argument("-p", "--password", required=False, help="Password")
 parser.add_argument("-s", "--server", required=False, help="Server", choices=[*SERVERS, ""])
-parser.add_argument("-l", "--log_level", required=False, help="Log level", default="CRITICAL", choices=list(logging.getLevelNamesMapping().keys()))
+parser.add_argument("-l", "--log_level", required=False, help="Log level", default="CRITICAL", choices=list(NAME_TO_LEVEL.keys()))
 parser.add_argument("-o", "--output", required=False, help="Output file")
 parser.add_argument("--host", required=False, help="Host")
 args = parser.parse_args()
@@ -40,7 +50,7 @@ if args.non_interactive and (not args.username or not args.password):
     parser.error("You need to specify username and password or run as interactive.")
 
 _LOGGER = logging.getLogger("token_extractor")
-_LOGGER.level = logging.getLevelNamesMapping()[args.log_level.upper()]
+_LOGGER.level = NAME_TO_LEVEL[args.log_level.upper()]
 handler = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
@@ -344,17 +354,28 @@ class XiaomiCloudConnector:
         return r.encrypt(base64.b64decode(payload))
 
 
-def print_if_interactive(value="") -> None:
+def print_if_interactive(value: str="") -> None:
     if not args.non_interactive:
         print(value)
 
-def print_tabbed(value, tab) -> None:
+def print_tabbed(value: str, tab: int) -> None:
     print_if_interactive(" " * tab + value)
 
 
-def print_entry(key, value, tab):
+def print_entry(key: str, value: str, tab: int) -> None:
     if value:
         print_tabbed(f'{key + ":": <10}{value}', tab)
+
+
+def print_banner() -> None:
+    print_if_interactive(r"""
+                               Xiaomi Cloud
+___ ____ _  _ ____ _  _ ____    ____ _  _ ___ ____ ____ ____ ___ ____ ____ 
+ |  |  | |_/  |___ |\ | [__     |___  \/   |  |__/ |__| |     |  |  | |__/ 
+ |  |__| | \_ |___ | \| ___]    |___ _/\_  |  |  \ |  | |___  |  |__| |  \ 
+                                                        by Piotr Machowski 
+
+    """)
 
 
 def start_image_server(image: bytes) -> None:
@@ -378,6 +399,7 @@ def start_image_server(image: bytes) -> None:
 
 
 def main() -> None:
+    print_banner()
     servers_str = ", ".join(SERVERS)
     if args.username:
         username = args.username
