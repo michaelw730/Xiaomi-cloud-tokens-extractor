@@ -15,11 +15,13 @@ from getpass import getpass
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import requests
+from colorama import Fore, Style, init
 
 try:
     from Crypto.Cipher import ARC4
 except ModuleNotFoundError:
     from Cryptodome.Cipher import ARC4
+
 from PIL import Image
 
 if sys.platform != "win32":
@@ -27,14 +29,14 @@ if sys.platform != "win32":
 
 SERVERS = ["cn", "de", "us", "ru", "tw", "sg", "in", "i2"]
 NAME_TO_LEVEL = {
-    'CRITICAL': logging.CRITICAL,
-    'FATAL': logging.FATAL,
-    'ERROR': logging.ERROR,
-    'WARN': logging.WARNING,
-    'WARNING': logging.WARNING,
-    'INFO': logging.INFO,
-    'DEBUG': logging.DEBUG,
-    'NOTSET': logging.NOTSET,
+    "CRITICAL": logging.CRITICAL,
+    "FATAL": logging.FATAL,
+    "ERROR": logging.ERROR,
+    "WARN": logging.WARNING,
+    "WARNING": logging.WARNING,
+    "INFO": logging.INFO,
+    "DEBUG": logging.DEBUG,
+    "NOTSET": logging.NOTSET,
 }
 
 parser = argparse.ArgumentParser()
@@ -49,12 +51,35 @@ args = parser.parse_args()
 if args.non_interactive and (not args.username or not args.password):
     parser.error("You need to specify username and password or run as interactive.")
 
+init(autoreset=True)
+
+class ColorFormatter(logging.Formatter):
+    COLORS = {
+        "CRITICAL": Fore.RED + Style.BRIGHT,
+        "FATAL": Fore.RED + Style.BRIGHT,
+        "ERROR": Fore.RED,
+        "WARN": Fore.YELLOW,
+        "WARNING": Fore.YELLOW,
+        "INFO": Fore.GREEN,
+        "DEBUG": Fore.BLUE,
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        color = self.COLORS.get(record.levelname, "")
+        return color + logging.Formatter.format(self, record)
+
+
+class ColorLogger(logging.Logger):
+    def __init__(self, name: str) -> None:
+        level = NAME_TO_LEVEL[args.log_level.upper()]
+        logging.Logger.__init__(self, name, level)
+        color_formatter = ColorFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(color_formatter)
+        self.addHandler(handler)
+
+logging.setLoggerClass(ColorLogger)
 _LOGGER = logging.getLogger("token_extractor")
-_LOGGER.level = NAME_TO_LEVEL[args.log_level.upper()]
-handler = logging.StreamHandler(sys.stdout)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-handler.setFormatter(formatter)
-_LOGGER.addHandler(handler)
 
 
 class XiaomiCloudConnector:
@@ -160,12 +185,15 @@ class XiaomiCloudConnector:
                 self._code = json_resp.get("code", None)
             else:
                 if "notificationUrl" in json_resp:
+                    if args.non_interactive:
+                        parser.error("2FA solution required, rerun in interactive mode")
                     verify_url = json_resp["notificationUrl"]
 
-                    print_if_interactive("Two factor authentication required, please use following url:")
+                    print_if_interactive(f"{Fore.YELLOW}Two factor authentication required, please use following URL to obtain 2FA code:")
                     print_if_interactive(verify_url)
+                    print_if_interactive(f"{Fore.RED}Do not enter the code on Xiaomi website!")
                     print_if_interactive()
-                    print_if_interactive("Ticket:")
+                    print_if_interactive("2FA Code:")
                     ticket = input()
 
                     json_resp = self.verify_ticket(verify_url, ticket)
@@ -237,8 +265,7 @@ class XiaomiCloudConnector:
         return response.status_code == 200
 
     def handle_captcha(self, captcha_url: str) -> str:
-
-        # Full URL in case it s relative
+        # Full URL in case it's relative
         if captcha_url.startswith("/"):
             captcha_url = "https://account.xiaomi.com" + captcha_url
 
@@ -248,6 +275,7 @@ class XiaomiCloudConnector:
             _LOGGER.error("Unable to fetch captcha image.")
             return ""
 
+        print_if_interactive("Captcha verification required.")
         try:
             # Try to serve an image file
             start_image_server(response.content)
@@ -267,7 +295,8 @@ class XiaomiCloudConnector:
                 print_if_interactive(f"Please open {tmp_path} and solve the captcha.")
 
         # Ask user for a captcha solution
-        captcha_solution: str = input("Enter captcha as shown in the image: ").strip()
+        print_if_interactive(f"Enter captcha as shown in the image {Fore.BLUE}(case-sensitive){Style.RESET_ALL}:")
+        captcha_solution: str = input().strip()
         return captcha_solution
 
     def login(self):
@@ -280,11 +309,11 @@ class XiaomiCloudConnector:
                 if self.login_step_3():
                     return True
                 else:
-                    print_if_interactive("Unable to get service token.")
+                    print_if_interactive(f"{Fore.RED}Unable to get service token.")
             else:
-                print_if_interactive("Invalid login or password.")
+                print_if_interactive(f"{Fore.RED}Invalid login or password.")
         else:
-            print_if_interactive("Invalid username.")
+            print_if_interactive(f"{Fore.RED}Invalid username.")
         return False
 
     def get_homes(self, country):
@@ -431,16 +460,17 @@ def print_tabbed(value: str, tab: int) -> None:
 
 def print_entry(key: str, value: str, tab: int) -> None:
     if value:
-        print_tabbed(f'{key + ":": <10}{value}', tab)
+        print_tabbed(f'{Fore.YELLOW}{key + ":" + Fore.RESET: <10}{value}', tab)
 
 
 def print_banner() -> None:
-    print_if_interactive(r"""
+    print_if_interactive(Fore.YELLOW + Style.BRIGHT + r"""
                                Xiaomi Cloud
 ___ ____ _  _ ____ _  _ ____    ____ _  _ ___ ____ ____ ____ ___ ____ ____ 
  |  |  | |_/  |___ |\ | [__     |___  \/   |  |__/ |__| |     |  |  | |__/ 
  |  |__| | \_ |___ | \| ___]    |___ _/\_  |  |  \ |  | |___  |  |__| |  \ 
-                                                        by Piotr Machowski 
+""" + Style.NORMAL +
+"""                                                        by Piotr Machowski 
 
     """)
 
@@ -471,22 +501,22 @@ def main() -> None:
     if args.username:
         username = args.username
     else:
-        print_if_interactive("Username (email or user ID):")
+        print_if_interactive(f"Username {Fore.BLUE}(email, phone number or user ID){Style.RESET_ALL}:")
         username = input()
     if args.password:
         password = args.password
     else:
-        print_if_interactive("Password:")
+        print_if_interactive(f"Password {Fore.BLUE}(not displayed for privacy reasons){Style.RESET_ALL}:")
         password = getpass("")
     if args.server is not None:
         server = args.server
     elif args.non_interactive:
         server = ""
     else:
-        print_if_interactive(f"Server (one of: {servers_str}) Leave empty to check all available:")
+        print_if_interactive(f"Server {Fore.BLUE}(one of: {servers_str}; Leave empty to check all available){Style.RESET_ALL}:")
         server = input()
         while server not in ["", *SERVERS]:
-            print_if_interactive(f"Invalid server provided. Valid values: {servers_str}")
+            print_if_interactive(f"{Fore.RED}Invalid server provided. Valid values: {servers_str}")
             print_if_interactive("Server:")
             server = input()
 
@@ -496,10 +526,10 @@ def main() -> None:
     else:
         servers_to_check = [*SERVERS]
     connector = XiaomiCloudConnector(username, password)
-    print_if_interactive("Logging in...")
+    print_if_interactive(f"{Fore.BLUE}Logging in...")
     logged = connector.login()
     if logged:
-        print_if_interactive("Logged in.")
+        print_if_interactive(f"{Fore.GREEN}Logged in.")
         print_if_interactive()
         output = []
         for current_server in servers_to_check:
@@ -514,19 +544,19 @@ def main() -> None:
                     all_homes.append({'home_id': h['home_id'], 'home_owner': h['home_owner']})
 
             if len(all_homes) == 0:
-                print_if_interactive(f'No homes found for server "{current_server}".')
+                print_if_interactive(f'{Fore.RED}No homes found for server "{current_server}".')
 
             for home in all_homes:
                 devices = connector.get_devices(current_server, home['home_id'], home['home_owner'])
                 home["devices"] = []
                 if devices is not None:
                     if devices["result"]["device_info"] is None or len(devices["result"]["device_info"]) == 0:
-                        print_if_interactive(f'No devices found for server "{current_server}" @ home "{home["home_id"]}".')
+                        print_if_interactive(f'{Fore.RED}No devices found for server "{current_server}" @ home "{home["home_id"]}".')
                         continue
                     print_if_interactive(f'Devices found for server "{current_server}" @ home "{home["home_id"]}":')
                     for device in devices["result"]["device_info"]:
                         device_data = {**device}
-                        print_tabbed("---------", 3)
+                        print_tabbed(f"{Fore.BLUE}---------", 3)
                         if "name" in device:
                             print_entry("NAME", device["name"], 3)
                         if "did" in device:
@@ -545,16 +575,16 @@ def main() -> None:
                         if "model" in device:
                             print_entry("MODEL", device["model"], 3)
                         home["devices"].append(device_data)
-                    print_tabbed("---------", 3)
+                    print_tabbed(f"{Fore.BLUE}---------", 3)
                     print_if_interactive()
                 else:
-                    print_if_interactive(f"Unable to get devices from server {current_server}.")
+                    print_if_interactive(f"{Fore.RED}Unable to get devices from server {current_server}.")
             output.append({"server": current_server, "homes": all_homes})
         if args.output:
             with open(args.output, "w") as f:
                 f.write(json.dumps(output, indent=4))
     else:
-        print_if_interactive("Unable to log in.")
+        print_if_interactive(f"{Fore.RED}Unable to log in.")
 
     if not args.non_interactive:
         print_if_interactive()
