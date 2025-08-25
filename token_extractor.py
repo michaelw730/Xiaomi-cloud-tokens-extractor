@@ -275,11 +275,11 @@ class XiaomiCloudConnector:
             _LOGGER.error("Unable to fetch captcha image.")
             return ""
 
-        print_if_interactive("Captcha verification required.")
+        print_if_interactive(f"{Fore.YELLOW}Captcha verification required.")
         try:
             # Try to serve an image file
             start_image_server(response.content)
-            print_if_interactive(f"Captcha image URL: http://{args.host or '127.0.0.1'}:31415")
+            print_if_interactive(f"Captcha image URL: {Fore.BLUE}http://{args.host or '127.0.0.1'}:31415")
         except Exception as e1:
             _LOGGER.debug(e1)
             # Save image to a temporary file
@@ -460,7 +460,7 @@ def print_tabbed(value: str, tab: int) -> None:
 
 def print_entry(key: str, value: str, tab: int) -> None:
     if value:
-        print_tabbed(f'{Fore.YELLOW}{key + ":" + Fore.RESET: <10}{value}', tab)
+        print_tabbed(f'{Fore.YELLOW}{key + ":": <10}{Style.RESET_ALL}{value}', tab)
 
 
 def print_banner() -> None:
