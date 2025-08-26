@@ -67,6 +67,7 @@ If you have problems with using this tool try following solutions:
 - Remove Cloudflare DNS
 - Disable network ad blockers (AdGuard, PiHole, etc.) and restrictions (UniFi Country Restriction etc.)
 - Open 2FA link on the same device that runs Tokens Extractor
+- Just wait - there is a [limit of 3/5 (depending on region) 2FA requests per day](https://account.xiaomi.com/helpcenter/faq/en_US/02.faqs/05.sms-and-email-verification-code/faq-3)
 
 ## Home Assistant additional tools
 
