@@ -190,11 +190,12 @@ class XiaomiCloudConnector:
                     verify_url = json_resp["notificationUrl"]
 
                     print_if_interactive(f"{Fore.YELLOW}Two factor authentication required, please use following URL to obtain 2FA code:")
-                    print_if_interactive(verify_url)
+                    print_if_interactive(f"{Fore.BLUE}{verify_url}")
                     print_if_interactive(f"{Fore.RED}Do not enter the code on Xiaomi website!")
                     print_if_interactive()
                     print_if_interactive("2FA Code:")
                     ticket = input()
+                    print_if_interactive()
 
                     json_resp = self.verify_ticket(verify_url, ticket)
                     if not json_resp:
@@ -297,6 +298,7 @@ class XiaomiCloudConnector:
         # Ask user for a captcha solution
         print_if_interactive(f"Enter captcha as shown in the image {Fore.BLUE}(case-sensitive){Style.RESET_ALL}:")
         captcha_solution: str = input().strip()
+        print_if_interactive()
         return captcha_solution
 
     def login(self):
@@ -527,6 +529,7 @@ def main() -> None:
         servers_to_check = [*SERVERS]
     connector = XiaomiCloudConnector(username, password)
     print_if_interactive(f"{Fore.BLUE}Logging in...")
+    print_if_interactive()
     logged = connector.login()
     if logged:
         print_if_interactive(f"{Fore.GREEN}Logged in.")
