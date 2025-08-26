@@ -2,3 +2,4 @@ requests
 pycryptodome
 charset-normalizer
 Pillow
+colorama
